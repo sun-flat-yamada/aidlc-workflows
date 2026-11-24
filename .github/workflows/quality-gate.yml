@@ -1,0 +1,109 @@
+name: Quality Gate
+
+# fork/custom 向けの品質ゲート（dev/change-dev.md）。成功すると auto-merge.yml が PR を Rebase Merge する。
+# upstream の CI（ci.yml など）は main 向けにしか走らないので、fork/custom ではこのゲートが代わりを務める。
+#  1. PR の作成先が fork に固定されていること（--repo の無い gh pr を禁止）
+#  2. dev/fork-sync-test.sh・dev/change-dev-test.sh（運用スクリプトのフィクスチャ検査）
+#  3. plan-check（PR のみ。計画先行）
+#  4. dev/upstream-checks.sh（upstream 自身の install / check / smoke）。失敗した段があれば base でも走らせ、
+#     **base では通る段が head で落ちたときだけ**赤にする（upstream 由来の既存の失敗で fork の作業を止めない）
+on:
+  pull_request:
+    branches: [fork/custom]
+    # ready_for_review / unlabeled: draft 解除や hold 外しで自動マージの判定をやり直すため
+    types: [opened, synchronize, reopened, ready_for_review, unlabeled]
+  push:
+    branches: [fork/custom]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Checkout (PR head, not the synthetic merge commit)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: PR target is pinned to this fork
+        # fork では gh pr の既定の対象が親リポジトリ（upstream: awslabs/aidlc-workflows）になる。
+        # fork が持つファイル（upstream に無いもの）で、--repo の無い gh pr を禁止する
+        run: |
+          files=".github/workflows/quality-gate.yml .github/workflows/auto-merge.yml .github/workflows/upstream-sync.yml $(ls dev/*.sh dev/*.md 2>/dev/null)"
+          bad=$(grep -nE '(^|[^[:alnum:]_-])gh pr [a-z]+' $files 2>/dev/null | grep -v -- '--repo' || true)
+          if [ -n "$bad" ]; then echo "::error::--repo の無い gh pr があります（upstream に PR を作る恐れ）"; printf '%s\n' "$bad"; exit 1; fi
+          echo "gh pr はすべて --repo 付き"
+
+      - name: Ops script tests
+        run: |
+          ./dev/fork-sync-test.sh
+          ./dev/change-dev-test.sh
+
+      - name: Plan-first check
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: ./dev/change-dev.sh plan-check origin/fork/custom "$HEAD_BRANCH"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.4'
+
+      - name: Upstream checks (head)
+        id: head
+        run: |
+          set +e
+          ./dev/upstream-checks.sh "$RUNNER_TEMP/head-logs" | tee "$RUNNER_TEMP/head.steps"
+          rc=${PIPESTATUS[0]}
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upstream checks (base) and compare
+        if: steps.head.outputs.rc != '0'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -uo pipefail
+          failed() { sed -n 's/^STEP \([a-z]*\) FAIL$/\1/p' "$1" | sort -u; }
+          failed "$RUNNER_TEMP/head.steps" > "$RUNNER_TEMP/head.fails"
+          if [ ! -s "$RUNNER_TEMP/head.fails" ]; then
+            # 非 0 なのに FAIL 行が無い＝途中で落ちた。base と比べず赤にする（fail-open にしない）
+            echo "::error::upstream-checks が結果を出さずに終了しました"; exit 1
+          fi
+          for s in $(cat "$RUNNER_TEMP/head.fails"); do echo "--- head の $s の末尾"; tail -40 "$RUNNER_TEMP/head-logs/$s.log" || true; done
+          if [ -z "${BASE_SHA:-}" ] || ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo "::error::比較する base がありません。head で落ちた段: $(echo $(cat "$RUNNER_TEMP/head.fails"))"; exit 1
+          fi
+          git worktree add --quiet --detach "$RUNNER_TEMP/base" "$BASE_SHA"
+          # base には dev/upstream-checks.sh が無いことがある（初回など）ので、head の版で base を検査する
+          (cd "$RUNNER_TEMP/base" && bash "$GITHUB_WORKSPACE/dev/upstream-checks.sh" "$RUNNER_TEMP/base-logs") | tee "$RUNNER_TEMP/base.steps" || true
+          failed "$RUNNER_TEMP/base.steps" > "$RUNNER_TEMP/base.fails"
+          new=$(comm -23 "$RUNNER_TEMP/head.fails" "$RUNNER_TEMP/base.fails")
+          if [ -n "$new" ]; then
+            echo "::error::base では通る段が head で落ちました: $(echo $new)"; exit 1
+          fi
+          echo "::warning::head で落ちた段は base でも落ちています（この変更による増加なし）: $(echo $(cat "$RUNNER_TEMP/head.fails"))"
+
+      - name: Keep logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-logs
+          path: |
+            ${{ runner.temp }}/head-logs/
+            ${{ runner.temp }}/base-logs/
+          if-no-files-found: ignore
