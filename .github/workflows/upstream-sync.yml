@@ -1,0 +1,66 @@
+name: Upstream Sync
+
+# upstream（awslabs/aidlc-workflows）の更新を週 1 回取り込む（dev/fork-sync.md が正本）。
+#   1. main を upstream/main へ fast-forward する（main は upstream のミラー）
+#   2. fork/custom + upstream の merge を sync/upstream-<sha> ブランチに作り、fork/custom 向け PR を開く
+# schedule は「既定ブランチにある定義」しか走らない。既定ブランチを fork/custom にすること。
+on:
+  schedule:
+    - cron: "0 0 * * 1" # 毎週月曜 00:00 UTC（09:00 JST）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # fork でだけ走らせる（upstream 側や、さらに fork された先では何もしない）
+    if: github.repository == 'sun-flat-yamada/aidlc-workflows'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: fork/custom
+          fetch-depth: 0
+          # upstream は .github/workflows/ を頻繁に変えるので、GITHUB_TOKEN では push が拒否される（workflows 権限を付与できない）。
+          # workflow 権限を持つトークンを secret SYNC_TOKEN に置くこと（必須。dev/fork-sync.md §2・§3）
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync main and build sync branch
+        id: sync
+        run: |
+          set -o pipefail
+          ./dev/fork-sync.sh sync --push | tee sync.log
+          grep -E '^(SYNC_BRANCH|UPSTREAM_SHA)=' sync.log >> "$GITHUB_OUTPUT" || true
+
+      # fork では gh の既定の対象が親リポジトリ（upstream）になる。gh pr は必ず --repo で fork を指す
+      - name: Open pull request into fork/custom
+        if: steps.sync.outputs.SYNC_BRANCH != ''
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+          BRANCH: ${{ steps.sync.outputs.SYNC_BRANCH }}
+          SHA: ${{ steps.sync.outputs.UPSTREAM_SHA }}
+        run: |
+          # 古い upstream SHA 向けの取り込み PR は新しい PR に含まれるので閉じる
+          gh pr list --repo "$GITHUB_REPOSITORY" --base fork/custom --state open --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"sync/upstream-\")) | select(.headRefName != \"$BRANCH\") | .number" |
+          while read -r n; do
+            gh pr close "$n" --repo "$GITHUB_REPOSITORY" --delete-branch --comment "新しい取り込み PR（$BRANCH）に置き換えました。"
+          done
+          if [ -n "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base fork/custom --state open --json number --jq '.[].number')" ]; then
+            echo "PR already open for $BRANCH"; exit 0
+          fi
+          gh pr create --repo "$GITHUB_REPOSITORY" --base fork/custom --head "$BRANCH" \
+            --title "chore(sync): merge upstream ${SHA:0:7} into fork/custom" \
+            --body "upstream \`awslabs/aidlc-workflows\` の \`main\` (${SHA}) を取り込みます。\`main\` は同じ SHA へ fast-forward 済みです。**「Create a merge commit」でマージしてください**（Rebase / Squash は upstream との祖先関係を切ります）。手順と衝突時の対応は \`dev/fork-sync.md\` を参照してください。"
