@@ -1192,15 +1192,16 @@ Refresh preserves:
   time it starts on its 3.0 engine. When the release changes what such a file
   allows (it drops an allow entry or adds a deny entry the file Kiro upgraded
   from had), the refresh puts the release's version back by itself, provided
-  Kiro upgrades it again by itself at its next 3.0 start (its auto-upgrade is
-  on: `chat.enableAutoAgentUpgrade` is true in your own Kiro settings, as
-  **Enable auto-upgrade** at Kiro's first 3.0 start saves it), that file is
-  the one AI-DLC wrote there, and nobody changed Kiro's copy since Kiro wrote it
-  (the `kiroUpgrade` stamp Kiro writes into the file still matches it; for a
-  copy Kiro did not stamp, every field but `tools`, `hooks` and `permissions`
-  is still the file's own); otherwise it keeps Kiro's copy and says, in one line,
-  that the file still allows what an older release allowed and that `--force`
-  takes the release's version. When the release no longer ships such a file,
+  `chat.enableAutoAgentUpgrade` is not `false` in your own Kiro settings (from
+  Kiro CLI 2.37 Kiro then upgrades it again by itself at its next 3.0 start; an
+  older Kiro CLI asks first), that file is the one AI-DLC wrote there, and
+  nobody changed Kiro's copy since Kiro wrote it (the `kiroUpgrade` stamp Kiro
+  writes into the file still matches it; a copy Kiro did not stamp goes back
+  only when the setting is `true` and every field but `tools`, `hooks` and
+  `permissions` is still the file's own); otherwise it keeps Kiro's copy and
+  says, in one line, that the file still allows what an older release allowed
+  and that `--force` takes the release's version. When the release no longer
+  ships such a file,
   the file Kiro upgraded from is the one AI-DLC wrote there and its stamp still
   matches, the refresh removes it like any file the release no longer ships,
   keeps Kiro's backups of it, and says so in one line
@@ -1969,7 +1970,12 @@ run it twice.
 The supported manual-copy payload is the versioned `aidlc-copy-runtime-X.Y.Z.tar.gz`
 release asset. Download one exact release, extract it, and copy the complete
 `runtime/<harness>/` root so the harness tree, `aidlc/` workspace shell, and
-any project-root files the harness needs stay together. The copy runtime leaves
+any project-root files the harness needs stay together. On Kiro, install with the
+guide's manual-copy steps instead:
+[Kiro](harnesses/kiro.md#versioned-manual-copy-alternative) copies
+`runtime/kiro-ide/` and
+[Kiro CLI (V2)](harnesses/kiro.md#kiro-cli-v2-versioned-manual-copy-alternative)
+copies `runtime/kiro/`, and both say how to keep the project's own Kiro settings. The copy runtime leaves
 out files a team's editor owns, such as Copilot's `.vscode/settings.json`, so
 copying never replaces them; the [Copilot guide](harnesses/copilot.md#vs-code-request-cap)
 names the one setting to add yourself. It leaves out your `.gitignore` and

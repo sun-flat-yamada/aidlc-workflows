@@ -6358,6 +6358,7 @@ export async function collectDoctorReport(
   try {
     const proc = Bun.spawnSync({
       cmd: ["git", "-C", projectDir, "branch", "--list", "bolt-*"],
+      env: process.env,
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -7473,6 +7474,14 @@ const LANG_BY_EXT: Record<string, string> = {
   ".hpp": "C++",
   ".swift": "Swift",
   ".php": "PHP",
+  // Scripts are code: installers, ops tooling and admin modules are often
+  // nothing but shell or PowerShell.
+  ".sh": "Shell",
+  ".bash": "Shell",
+  ".zsh": "Shell",
+  ".ksh": "Shell",
+  ".ps1": "PowerShell",
+  ".psm1": "PowerShell",
   // Infrastructure code is code (Terraform, Terragrunt and Packer, Bicep).
   ".tf": "Terraform",
   ".hcl": "HCL",
@@ -7957,6 +7966,7 @@ function gitRmFlatTree(projectDir: string, flatTree: string): void {
     // Untrack (cached only — the data already moved). Ignore failure (non-git
     // project, or already untracked) — the rmSync below still tidies disk.
     Bun.spawnSync(["git", "-C", projectDir, "rm", "-r", "--cached", "--quiet", "--", flatTree], {
+      env: process.env,
       stdout: "ignore",
       stderr: "ignore",
     });
