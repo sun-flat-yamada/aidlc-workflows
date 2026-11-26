@@ -553,7 +553,12 @@ Either way the hook's environment is the host tool's, never the project's `.env`
 compiled engine is built with Bun's dotenv and bunfig autoload off, and a Bun-run tree
 evaluates `aidlc-runtime-paths.ts` first (every entry imports it before its own body) to drop the AI-DLC and host-tool names those files
 assigned (`AIDLC_*`, `AWS_AIDLC_*`, the `CLAUDE_*`, `KIRO_*`, `CODEX_*`, `CURSOR_*`,
-`COPILOT_*`, `XDG_*` and `GIT_CONFIG*` names), in the dispatcher and in each tool it spawns.
+`COPILOT_*` and `XDG_*` names), in the dispatcher and in each tool it spawns. It drops the same way
+the names that tell a program the engine starts what else to run, so a file of the repository's is
+never handed to git, to ssh or to a sensor's compiler: every `GIT_*` name, `SSH_ASKPASS*`, `BUN_*`,
+`NODE_OPTIONS`, `NODE_PATH`, `NPM_CONFIG_*`, `LD_*`, `DYLD_*`, `BASH_ENV`, `EDITOR` and `VISUAL`.
+A child the engine starts gets the environment as settled this way: every spawn passes it, Bun's own
+spawn included, which would otherwise hand a child the environment Bun started with.
 The person's own application names stay as the shell had them, and so do the two
 declarations only a host makes, the unattended flag and the dispatcher's internal tokens.
 The compiled engine loads hook modules from the runtime payload beside the
@@ -2719,8 +2724,10 @@ checkout has merged that branch, is nobody's change and is not named, and one
 the build changed on top of a teammate's copy is put back as that branch has it,
 or as the work found it when that branch has no such file (`remoteBranchCopies`,
 read in each repository's and recorded checkout's own
-folder, never fetched; the code plan question's already-changed line and the
-close's check of changes outside the Units leave the same files out). That
+folder, never fetched, and for a submodule in its own checkout, at the commit
+that branch records for it, when that is the commit checked out; the code plan
+question's already-changed line and the close's check of changes outside the
+Units leave the same files out). That
 includes a change the build made once it is pushed to that branch and merged
 here; a change only on this machine (uncommitted, or committed and not pushed)
 is named and counted as before. The listings are AI-DLC's ignored
