@@ -1,5 +1,9 @@
 # 取り込み設計: Excel パーサーと結合表の機械チェック
 
+> **実装済み**（この設計どおり。決めてほしいことは推奨どおりにした: 契約は `apiSpecs:` か `contract-summary.md` の
+> `openapi` ブロック、深刻度は advisory）。使い方は [README.md](README.md)、取り込み先は [ADOPTION.ja.md](ADOPTION.ja.md)。
+> 設計から変えた点: レベル 4 のテンプレート走査は `angular.json` の `sourceRoot`（無ければ `src/`）に限った（モックアップの HTML を数えないため）。
+
 `ai-dlc-sdk-angular` の 2 つの機構を、AI-DLC の決まり（配布物は実行時に Bun 以外の依存を持たない、`core/` を変えない、
 ガードは人を止めずエージェントに次の一手を返す）を守ったまま angular プラグインに取り込む設計。
 どちらも SDK のロジック（TypeScript）はそのまま移植でき、置き換えるのは依存ライブラリだけ。

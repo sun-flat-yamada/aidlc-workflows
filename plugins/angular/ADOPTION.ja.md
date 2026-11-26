@@ -17,6 +17,8 @@ SDK のうち**それと役割が重なる実行基盤は取らず、Angular 固
 | REST は既存の API クライアント経由・型付きエラー、`operationId` ごとに 1 メソッド | 同上 | SDK 固有のクラス名（`ApiClient` 等）は「プロジェクトの API クライアントラッパー」に一般化 |
 | `data-ui-id` を唯一のセレクタにする規約 | 規約・ガイド・build-and-test の寄与 | |
 | `ui-bindings.yaml`（UI 要素 ⇄ API 操作 ⇄ 状態 ⇄ エラー処理の結合） | functional-design の寄与（`frontend-components.md` の `## UI Bindings` 節） | 独立ファイルではなく既存の成果物の節にした（後述） |
+| 結合表の Gate 0（`validate-inputs.ts`。表の形・OpenAPI・デザイン HTML・要件との突き合わせ、結合マトリクス） | センサー `angular-ui-bindings`（functional-design・code-generation のゲート）・コマンド `aidlc angular-bindings-check` | `yaml`/`zod` を `Bun.YAML` と手書きの検証に置き換えた。相手が見つかった段だけ走らせ、見つからない段は「未確認」と出す。code-generation ではテンプレートの `data-ui-id` との照合を足した（SDK には無い） |
+| Excel パーサー（`excel-to-test-ast.ts`・subsystem-cases） | コマンド `aidlc angular-cases`（xlsx/CSV/Markdown → `angular-acceptance-cases.json`）・`angular-acceptance-gate` の強化 | `exceljs` を使わず ZIP と XML を自前で読む（`node:zlib`）。SDK の見出しの別名・ハッシュの形は互換で、SDK のサンプル Excel から同じ `casesSha256` が出ることを確かめた |
 | 入力が食い違ったときの優先順位（振る舞い＝bindings、見た目＝デザイン、通信形式＝OpenAPI） | 規約・functional-design の寄与・ガイド | |
 | 変更影響マップと境界ゾーン（immutable / extensible=追記のみ / rebuildable / deletable） | code-generation の寄与（計画の `## Change Impact Map`） | ゾーンは計画の中で宣言する形にした（後述） |
 | build → lint → unit(+coverage) を緑になるまで回す、閾値 80/70/80/80 | `memory/phases/construction.md`・code-generation の寄与 | |
@@ -34,8 +36,7 @@ SDK のうち**それと役割が重なる実行基盤は取らず、Angular 固
 | 独自オーケストレーター（準備 → 反復 i=1..N → 後処理を自動で回す `full-loop`） | AI-DLC ではエンジンが次の段を決め、conductor が作業を割り振り、人がゲートで判断する。自動で N 回回す別ループを足すと「進め方の持ち主」が二重になり（AGENTS.md の One owner per rule に反する）、人が舵を握る原則とも衝突する。上限と失敗の扱いだけを規律として取った |
 | git diff による境界ガードの自動リバート（違反ファイルを丸ごとベースラインに戻す） | 一度書いた作業をツールが黙って消す破壊的な動作で、AI-DLC の「ガードは次の一手を示して止めるだけ、人の作業や設定を勝手に変えない」に反する。追記可能なファイルでは正しい追記まで消える欠点も SDK 自身が書いている。代わりに計画の影響マップで宣言し、失敗分類 B で直させる |
 | `boundary-policy.yaml` という独立の設定ファイルとグロブ照合 | プロジェクトごとにパスが違い、AI-DLC には既にプロジェクト規約（`memory/project.md`）と計画承認がある。ゾーンは Code Generation の計画に書き、人が承認する形にした。機械照合が必要になったら、計画の表を読むセンサーとして足せる |
-| Excel パーサー（`excel-to-test-ast.ts`、`exceljs` 依存） | AI-DLC の配布物は実行時に Bun 標準以外の依存を持たない。依存なしで読む取り込み方を [PROPOSALS.ja.md](PROPOSALS.ja.md) に設計した（未実装） |
-| `ui-bindings.yaml` の JSON Schema と Gate 0（HTML・OpenAPI・Excel との突き合わせ） | 突き合わせの相手の置き場所がプロジェクトごとに違い、AI-DLC の成果物とも形が違う。4 段に分けて相手が見つかった段だけ走らせる取り込み方を [PROPOSALS.ja.md](PROPOSALS.ja.md) に設計した（未実装） |
+| `ui-bindings.yaml` の JSON Schema（`write-schemas.ts`）と `exceljs` 依存 | 表は Markdown の中にあり、エディタ補完の対象ではない。AI-DLC の配布物は実行時に Bun 標準以外の依存を持たないので、Excel は依存なしで読む形で取り込んだ（上の表） |
 | `ui-bindings.yaml` を独立した成果物にすること | プラグインが per-Unit の段に足す成果物は、その段の全 Unit 種別（service・library を含む）で必須になる。UI のある Unit だけが作る既存の `frontend-components.md` の節にすれば、UI のない Unit を邪魔しない |
 | QCD ベンチマーク（人の開発との品質・コスト・納期比較、`human-qcd.json`） | 同じ要件を人でも開発した実験用の比較で、通常の開発では基準データが無い。AI 使用量の記録は AI-DLC 側に別の仕組み（usage ledger）がある |
 | 逆生成ドキュメント skill（再利用/差分アーキテクチャ・画面と状態・API シーケンス・要件⇄テストの 4 軸） | AI-DLC は設計を先に作ってから実装する順序で、同じ内容（コンポーネント、状態遷移、契約、トレーサビリティ）が functional-design・contract-design・traceability.json に既にある。既存コードからの逆生成は reverse-engineering 段が担う |

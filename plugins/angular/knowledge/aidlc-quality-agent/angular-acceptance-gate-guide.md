@@ -26,6 +26,16 @@ for itself that it is done.
 `@<ui-id>` must name an element in the `## UI Bindings` table; flag one that
 does not before writing tests.
 
+## Reading the cases
+
+Convert the team's file with `aidlc angular-cases <file>... --out
+<record>/construction/build-and-test` (`.xlsx`, `.csv` or Markdown tables; add
+`--alias "<header>=<field>"` for a header it does not know). It writes
+`angular-acceptance-cases.json` and a Markdown checklist; read steps and
+expected values from the JSON, never retype them from the spreadsheet. The
+acceptance-gate sensor recomputes the hashes in that file, so an edited case or
+a changed spreadsheet shows up before the gate.
+
 ## Writing the tests
 
 - One test per case, title `[<case id>] <case title>`; one test covers one case.

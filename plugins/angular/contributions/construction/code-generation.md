@@ -4,6 +4,7 @@ plugin: angular
 adds:
   sensors:
     - angular-test-integrity
+    - angular-ui-bindings
 fragments:
   - anchor: after-step:2
     order: 100
@@ -63,4 +64,7 @@ The angular plugin adds `angular-test-integrity` (advisory, at the gate): once
 per Unit, on `code-summary.md`, it scans the project's spec files for tests
 switched off (`.skip`, `.only`, `xit`, `fit`, `test.fixme`) or forced
 (`waitForTimeout`, `force: true`) and names each line. Fix the test, never the
-expectation.
+expectation. It also adds `angular-ui-bindings`, which on `code-summary.md`
+checks that every ui-id of the Unit's `## UI Bindings` table appears in a
+template as `data-ui-id` (or a `uiId` input) and lists template ui-ids that no
+table names.

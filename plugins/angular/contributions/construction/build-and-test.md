@@ -23,8 +23,16 @@ table, or a JSON list in the workspace; ask once where they are if the
 requirements or practices do not say), they are the acceptance criteria and the
 final gate of this stage. Do not rewrite them.
 
-1. Read the cases into a list of ids. Record the SHA-256 of the case file before
-   any test is written (`cases_sha256_before`).
+1. Convert the cases before any test is written:
+   `{{INVOKE}} angular-cases <case file>... --out <record>/construction/build-and-test`
+   (`.xlsx`, `.csv` or a Markdown table; `--sheet` picks sheets, `--alias
+   "<header>=<field>"` maps a column name it does not know). It writes
+   `angular-acceptance-cases.json` (the structured cases, each source file's
+   SHA-256 and the hash of the cases) and a readable
+   `angular-acceptance-cases.md`. Read its warnings; a case it could not parse
+   is fixed in the source with the person, not in the JSON. For another format,
+   list the case ids yourself and record the SHA-256 of the case file
+   (`cases_sha256_before`).
 2. Write one end-to-end test per case (Playwright, or the E2E runner the project
    already uses), in the project's E2E folder. The test title starts with
    `[<case id>]`. A test covers one case; a case may have several tests.
@@ -33,7 +41,9 @@ final gate of this stage. Do not rewrite them.
    from the `## UI Bindings` table. REST responses the case lists are mocked at
    the network layer for that test; the requests the case expects are asserted,
    and "is not sent" becomes an assertion that no such request was made.
-4. Expected values come from the case text verbatim, translated to web-first
+4. Expected values come from the converted case (`expectedUi`, `expectedCss`,
+   `expectedApi`, `mockApi`), read from the JSON at test time where the runner
+   allows rather than copied into the test, translated to web-first
    assertions (`toHaveText`, `toBeDisabled`, `toBeVisible`, `toHaveCSS`, ...).
    Never `test.skip`, `test.fixme`, `test.only`, fixed sleeps or forced clicks.
    A case that cannot be automated as written still gets the closest faithful
@@ -78,13 +88,18 @@ deliverable:
 ```
 
 `status` is `passed`, `failed`, `skipped` or `timedOut`, as the runner reports
-it. With no team cases, write `"source": "none"` and an empty `cases` list.
+it. With `angular-acceptance-cases.json` beside it, `cases` and the two hashes
+may be left out: the gate check takes the case ids from that file and
+recomputes its hashes. With no team cases, write `"source": "none"` and an
+empty `cases` list.
 
 ## fragment: in:Sensors
 
 The angular plugin adds two advisory gate checks here, both on
 `build-and-test-summary.md`: `angular-acceptance-gate` reads
 `angular-acceptance-results.json` (every case has a passing, non-skipped test;
-no unknown case ids; the case file unchanged) and `angular-test-integrity` scans
+no unknown case ids; with `angular-acceptance-cases.json`, the converted cases
+and their source files unchanged, recomputed by the check itself, and every
+`@ui-id` of a case present in a Unit's UI Bindings table) and `angular-test-integrity` scans
 the project's spec files for tests switched off or forced. Their findings come
 back before the gate; fix the code or the test, never the case.

@@ -1,7 +1,7 @@
 {
   "name": "angular",
-  "version": "0.2.0",
-  "description": "Angular front-end pack: Angular implementation rules, a UI-element-to-API-to-state binding table in the functional design, a change impact map with reuse/append-only/rebuild/delete zones, the build-lint-unit loop, and the human-written acceptance cases as the final gate, checked by two advisory sensors, plus the local Angular CLI MCP server (aidlc angular-mcp).",
+  "version": "0.3.0",
+  "description": "Angular front-end pack: Angular implementation rules, a UI Bindings table (element to operation to state) checked against the contract, mock-ups and templates, a change impact map, the build-lint-unit loop, human-written acceptance cases (converted from Excel, CSV or Markdown) as the final gate, advisory gate sensors, and the local Angular CLI MCP server.",
   "author": {
     "name": "sun-flat-yamada"
   },
@@ -21,6 +21,14 @@
       "angular-mcp": {
         "script": "tools/angular-mcp.ts",
         "description": "Add the Angular CLI MCP server (local, read-only, offline) to this project's MCP settings"
+      },
+      "angular-cases": {
+        "script": "tools/angular-cases.ts",
+        "description": "Convert acceptance cases (.xlsx, .csv or a Markdown table) to angular-acceptance-cases.json"
+      },
+      "angular-bindings-check": {
+        "script": "tools/angular-bindings-check.ts",
+        "description": "Check a UI Bindings table against the contract and the mock-ups, and print its matrix"
       }
     }
   }
