@@ -17,3 +17,10 @@ AGENTS.md の「Branch from the latest `main`」は upstream への貢献の規�
 - 品質ゲートは upstream 自身の検査を `dev/upstream-checks.sh`（install / `bun run check` / smoke）で走らせる。手元でも同じものを通す。
 - `dev/fork-sync.sh`・`dev/change-dev.sh` を変えたら `dev/fork-sync-test.sh`・`dev/change-dev-test.sh` を通す。
 - upstream のワークフロー（`.github/workflows/` の既存ファイル）は編集しない。fork で止めたいものは Actions の UI で無効にする（`dev/fork-sync.md` §3.1）。
+
+### Angular 版（`fork/custom-for-angular`）
+
+`fork/custom-for-angular` は `fork/custom` から切った Angular 前提の版で、差分は `plugins/angular/`（AIDLC プラグイン）だけに置く
+（`core/`・`harness/` は変えないので upstream の取り込みで衝突しない）。このブランチ向けの PR の base は `fork/custom-for-angular`。
+品質ゲートと自動マージは `fork/custom` 向けだけなので、人がマージする。取り込みの経緯と見送った項目は `plugins/angular/ADOPTION.ja.md`。
+`fork/custom` の更新は `fork/custom-for-angular` へ merge コミットで取り込む。
