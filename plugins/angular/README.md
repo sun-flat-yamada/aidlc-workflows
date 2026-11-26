@@ -8,7 +8,7 @@
 The practices come from an in-repository AI-DLC SDK for Angular front-panel
 GUIs that ran a generate → gate → fix loop against a human-written acceptance
 specification. What carried over, and what did not and why, is listed in
-[ADOPTION.ja.md](ADOPTION.ja.md).
+[ADOPTION.ja.md](ADOPTION.ja.md). Designs for the Excel case parser and the binding-table check are in [PROPOSALS.ja.md](PROPOSALS.ja.md).
 
 ## What it adds
 
@@ -19,9 +19,12 @@ specification. What carried over, and what did not and why, is listed in
 | `functional-design` (contribution) | Step 4a: a `## UI Bindings` section in `frontend-components.md` — a YAML table binding each screen element (`ui-id`) to its operation (`operationId`), request mapping, states, transitions and per-error-kind outcomes |
 | `code-generation` (contribution) | Step 2a: a `## Change Impact Map` in the plan with four zones (Reuse / Append-only / New-rebuild / Delete) and the Angular step order; Step 4a: what the developer delegation adds; the `angular-test-integrity` sensor |
 | `build-and-test` (contribution) | Step 8a: the team's acceptance cases become one E2E test per case titled `[<case id>]`, selected by `data-ui-id`, REST mocked per case, expected values verbatim; Step 9a: run them, fix by failure class (Boundary / Design / API / Reuse / Test / Environment), stop after three rounds, write `angular-acceptance-results.json`; both sensors |
+| `reverse-engineering` (contribution) | Step 2a: Angular workspace facts (`list_projects`, `onpush_zoneless_migration`) from the MCP server when present |
 | `aidlc-developer-agent` (persona contribution) | A pointer to the Angular guide and the impact map |
 | Knowledge | `aidlc-developer-agent/angular-implementation-guide.md`, `aidlc-quality-agent/angular-acceptance-gate-guide.md` |
 | Sensors (advisory, at the gate) | `angular-test-integrity` scans the project's `*.spec.ts` / `*.test.ts` for `.skip`, `.only`, `xit`, `fit`, `test.fixme`, `waitForTimeout`, `force: true`; `angular-acceptance-gate` reads `angular-acceptance-results.json` (every case has a passing, non-skipped test, no unknown ids, case file unchanged) |
+| Command `aidlc angular-mcp` | Adds the Angular CLI MCP server to the project's MCP settings for the harness in use (`.mcp.json`, `.kiro/settings/mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`; printed for other hosts): `npx --no-install ng mcp --read-only --local-only`, i.e. the project's own CLI, on this machine, offline, changing nothing. `--dry-run`, `--remove`, `--print`. Reverse Engineering and Code Generation use its `list_projects`, `get_best_practices` and `onpush_zoneless_migration` tools when it is there |
+| Doctor check | The plugin's files are installed; in an Angular workspace, an advisory row when the MCP server is not configured |
 
 Advisory gate checks report their findings to the agent before the gate opens,
 so the agent fixes them first; they never block the person.
