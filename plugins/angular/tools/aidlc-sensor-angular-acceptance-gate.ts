@@ -6,11 +6,16 @@
 // every case needs a passing test titled "[<case id>] ...", nothing skipped,
 // nothing unknown, and the case file unchanged during the run. Self-contained:
 // a plugin tool must not import a core tool.
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
+import { allRecordUiIds } from "./angular-bindings-lib.ts";
 
 const TRIGGER_FILE = "build-and-test-summary.md";
 const RESULTS_FILE = "angular-acceptance-results.json";
+// Written by `aidlc angular-cases`; when present, the case list and the hashes
+// come from it and are recomputed here instead of trusted from the results file.
+const CASES_FILE = "angular-acceptance-cases.json";
 
 export interface Finding {
   case?: string;
@@ -114,6 +119,43 @@ export function evaluate(parsed: ResultsFile): Result {
   return result(findings, caseIds.length, passed);
 }
 
+interface CaseFile {
+  sources?: { file?: unknown; sha256?: unknown }[];
+  casesSha256?: unknown;
+  cases?: { id?: unknown; uiRefs?: unknown }[];
+}
+
+const sha = (data: Buffer | string) => createHash("sha256").update(data).digest("hex");
+
+/** Checks the converted case file and returns its case ids, or findings when it was edited. */
+export function checkCaseFile(file: CaseFile, projectDir: string, knownUiIds: Set<string> | null): { ids: string[]; findings: Finding[] } {
+  const findings: Finding[] = [];
+  const cases = Array.isArray(file.cases) ? file.cases : [];
+  const ids = cases.map((c) => (typeof c?.id === "string" ? c.id : "")).filter(Boolean);
+  if (typeof file.casesSha256 !== "string" || sha(JSON.stringify(file.cases ?? [])) !== file.casesSha256) {
+    findings.push({ message: `${CASES_FILE} differs from what angular-cases wrote (cases edited after conversion); convert the case file again` });
+  }
+  for (const src of Array.isArray(file.sources) ? file.sources : []) {
+    if (typeof src?.file !== "string") continue;
+    const path = isAbsolute(src.file) ? src.file : join(projectDir, src.file);
+    if (!existsSync(path)) findings.push({ message: `case source ${src.file} is missing` });
+    else if (sha(readFileSync(path)) !== src.sha256) findings.push({ message: `case source ${src.file} changed since it was converted; convert it again` });
+  }
+  if (knownUiIds) {
+    for (const c of cases) {
+      const refs = Array.isArray(c?.uiRefs) ? c.uiRefs.filter((r): r is string => typeof r === "string") : [];
+      for (const ref of refs) if (!knownUiIds.has(ref)) findings.push({ case: String(c.id), message: `@${ref} is not a ui-id in any UI Bindings table` });
+    }
+  }
+  return { ids, findings };
+}
+
+/** `<record>` for `<record>/construction/build-and-test/<file>`. */
+function recordOf(outputPath: string): string | null {
+  const construction = dirname(dirname(outputPath));
+  return basename(construction) === "construction" ? dirname(construction) : null;
+}
+
 export function main(argv: string[]): void {
   const flags = parseFlags(argv);
   if (!flags.outputPath) {
@@ -138,7 +180,26 @@ export function main(argv: string[]): void {
     process.stdout.write(`${JSON.stringify(result([{ message: `${RESULTS_FILE} is not valid JSON: ${message}` }]))}\n`);
     return;
   }
-  process.stdout.write(`${JSON.stringify(evaluate(parsed ?? {}))}\n`);
+  const casesPath = join(dirname(flags.outputPath), CASES_FILE);
+  if (!existsSync(casesPath)) {
+    process.stdout.write(`${JSON.stringify(evaluate(parsed ?? {}))}\n`);
+    return;
+  }
+  let caseFile: CaseFile;
+  try {
+    caseFile = JSON.parse(readFileSync(casesPath, "utf-8"));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stdout.write(`${JSON.stringify(result([{ message: `${CASES_FILE} is not valid JSON: ${message}` }]))}\n`);
+    return;
+  }
+  const projectDir = process.env.AIDLC_PROJECT_DIR ?? process.cwd();
+  const record = recordOf(flags.outputPath);
+  const tables = record ? allRecordUiIds(record) : { ids: new Set<string>(), tables: 0 };
+  const checked = checkCaseFile(caseFile ?? {}, projectDir, tables.tables > 0 ? tables.ids : null);
+  const verdict = evaluate({ ...(parsed ?? {}), cases: checked.ids, source: parsed?.source ?? CASES_FILE });
+  const findings = [...checked.findings, ...verdict.findings];
+  process.stdout.write(`${JSON.stringify(result(findings, verdict.cases, verdict.passed))}\n`);
 }
 
 if (import.meta.main) main(process.argv.slice(2));

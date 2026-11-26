@@ -1,8 +1,13 @@
 ---
 target: functional-design
 plugin: angular
+adds:
+  sensors:
+    - angular-ui-bindings
 fragments:
   - anchor: after-step:4
+    order: 100
+  - anchor: in:Sensors
     order: 100
 ---
 
@@ -18,11 +23,12 @@ explicit with stable IDs, in a fenced ```yaml block that is the source of truth
 for screen behaviour:
 
 ```yaml
+apiSpecs: [<openapi file>]     # project-relative; omit to use the OpenAPI blocks of contract-summary.md
 screens:
   <screen-id>:                 # kebab-case, unique
     route: /<path>
     requirements: [FR1, AC1.2.1]
-    design: <mock-up file>     # when Refined Mockups or the team supplied one
+    design: <mock-up file>     # project-relative, or a file of Refined Mockups
     states: [loading, editing, saving, saved, error]
     initial: loading
     onEnter: { call: <operationId>, success: { transition: editing }, errors: { default: { transition: error } } }
@@ -59,3 +65,14 @@ Rules for the section:
   disagreement under the Unit's assumptions rather than choosing silently.
 - Use `functional-spec.md` for the state machine prose; this table names the
   same states, it does not redefine them.
+
+## fragment: in:Sensors
+
+The angular plugin adds `angular-ui-bindings` (advisory, at the gate, once per
+Unit on `functional-spec.md`): it reads the `## UI Bindings` table of this
+Unit's `frontend-components.md` and checks it against itself (ids, states,
+transitions), the contract (`apiSpecs:` files or the OpenAPI blocks of
+`contract-summary.md`: operation ids, request fields, response paths) and each
+screen's mock-up (`data-ui-id`). A Unit without the table passes; a level whose
+counterpart is missing is listed as not checked. Run it on demand with
+`{{INVOKE}} angular-bindings-check <path to frontend-components.md>`.

@@ -35,5 +35,12 @@ It reports a finding when:
   were edited during the run);
 - the pass rate is below `min_pass_rate` (default 1.0).
 
+When `angular-acceptance-cases.json` (written by `aidlc angular-cases`) is in
+the same folder, the case list comes from it instead of the results file, and
+the sensor itself recomputes the hash of the cases and the SHA-256 of each
+source file, so an edited case or a changed workbook is reported without
+trusting what the agent wrote. Each case's `@ui-id` must then name an element
+of a Unit's `## UI Bindings` table (when any Unit has one).
+
 When the team supplied no acceptance cases, the file says
 `"source": "none"` with an empty `cases` list and the sensor passes.
