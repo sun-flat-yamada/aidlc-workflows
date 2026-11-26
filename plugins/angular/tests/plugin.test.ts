@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { validatePluginContent, walkMarkdownFiles } from "../../../tests/harness/plugin-kit.ts";
 import { evaluate } from "../tools/aidlc-sensor-angular-acceptance-gate.ts";
 import { scanProject } from "../tools/aidlc-sensor-angular-test-integrity.ts";
+import { serverEntry, supportsMcp } from "../tools/angular-mcp-config.ts";
 
 setDefaultTimeout(NATIVE_FIXTURE_SETUP_TIMEOUT_MS);
 
@@ -197,6 +198,101 @@ describe("angular-acceptance-gate judges the human-written cases", () => {
   });
 });
 
+describe("aidlc angular-mcp adds the local Angular CLI MCP server", () => {
+  const tool = join(PLUGIN_ROOT, "tools", "angular-mcp.ts");
+  const doctor = join(PLUGIN_ROOT, "tools", "angular-doctor.ts");
+  let project = "";
+
+  const run = (script: string, args: string[], harness = ".claude") =>
+    spawnSync(process.execPath, [script, ...args], {
+      timeout: remainingOperationTimeoutMs(NATIVE_STARTUP_TIMEOUT_MS),
+      encoding: "utf-8",
+      env: { ...process.env, AIDLC_PROJECT_DIR: project, AIDLC_HARNESS_DIR: harness },
+    });
+
+  beforeAll(() => {
+    project = mkdtempSync(join(tmpdir(), "aidlc-angular-mcp-"));
+  });
+
+  afterAll(() => {
+    if (project) rmSync(project, { recursive: true, force: true });
+  });
+
+  test("the entry runs the project's own CLI, read-only and offline", () => {
+    expect(serverEntry("linux")).toEqual({
+      command: "npx",
+      args: ["--no-install", "ng", "mcp", "--read-only", "--local-only"],
+    });
+    expect(serverEntry("win32").command).toBe("cmd");
+    expect(serverEntry("win32").args.slice(0, 2)).toEqual(["/c", "npx"]);
+    expect(supportsMcp("20.2.0")).toBe(true);
+    expect(supportsMcp("22.3.0")).toBe(true);
+    expect(supportsMcp("20.1.9")).toBe(false);
+    expect(supportsMcp("19.2.0")).toBe(false);
+  });
+
+  test("refuses without angular.json or without the installed CLI, changing nothing", () => {
+    expect(run(tool, []).status).toBe(1);
+    expect(existsSync(join(project, ".mcp.json"))).toBe(false);
+    writeFileSync(join(project, "angular.json"), "{}\n");
+    const noCli = run(tool, []);
+    expect(noCli.status).toBe(1);
+    expect(noCli.stdout).toContain("not installed");
+    expect(existsSync(join(project, ".mcp.json"))).toBe(false);
+  });
+
+  test("adds the server beside existing ones, is idempotent, and removes only its own entry", () => {
+    mkdirSync(join(project, "node_modules", "@angular", "cli"), { recursive: true });
+    writeFileSync(join(project, "node_modules", "@angular", "cli", "package.json"), JSON.stringify({ version: "22.3.0" }));
+    writeFileSync(join(project, ".mcp.json"), JSON.stringify({ mcpServers: { other: { command: "x" } } }));
+    const before = run(doctor, []);
+    expect(before.stdout).toContain('"label":"Angular CLI MCP server configured","fix"');
+    expect(JSON.parse(before.stdout).checks.at(-1).pass).toBe(false);
+
+    expect(run(tool, ["--dry-run"]).stdout).toContain("Would add");
+    expect(JSON.parse(readFileSync(join(project, ".mcp.json"), "utf-8")).mcpServers["angular-cli"]).toBeUndefined();
+
+    const added = run(tool, []);
+    expect(added.status, added.stdout).toBe(0);
+    const config = JSON.parse(readFileSync(join(project, ".mcp.json"), "utf-8"));
+    expect(config.mcpServers.other).toEqual({ command: "x" });
+    expect(config.mcpServers["angular-cli"]).toEqual(serverEntry());
+    expect(run(tool, []).stdout).toContain("already runs");
+    expect(JSON.parse(run(doctor, []).stdout).checks.at(-1).pass).toBe(true);
+
+    expect(run(tool, ["--remove"]).status).toBe(0);
+    const after = JSON.parse(readFileSync(join(project, ".mcp.json"), "utf-8"));
+    expect(after.mcpServers).toEqual({ other: { command: "x" } });
+  });
+
+  test("never overwrites an angular-cli entry it did not write", () => {
+    writeFileSync(join(project, ".mcp.json"), JSON.stringify({ mcpServers: { "angular-cli": { command: "npx", args: ["-y", "@angular/cli", "mcp"] } } }));
+    const result = run(tool, []);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("left as it is");
+    expect(JSON.parse(readFileSync(join(project, ".mcp.json"), "utf-8")).mcpServers["angular-cli"].args).toEqual(["-y", "@angular/cli", "mcp"]);
+    expect(run(tool, ["--remove"]).status).toBe(1);
+  });
+
+  test("writes Codex's TOML and Kiro's settings file, and prints for other hosts", () => {
+    rmSync(join(project, ".mcp.json"));
+    expect(run(tool, [], ".codex").status).toBe(0);
+    const toml = readFileSync(join(project, ".codex", "config.toml"), "utf-8");
+    expect(toml).toContain("[mcp_servers.angular-cli]");
+    expect(toml).toContain('"--read-only", "--local-only"');
+    expect(run(tool, [], ".codex").stdout).toContain("already runs");
+    expect(run(tool, ["--remove"], ".codex").status).toBe(0);
+    expect(readFileSync(join(project, ".codex", "config.toml"), "utf-8")).not.toContain("angular-cli");
+
+    expect(run(tool, [], ".kiro").status).toBe(0);
+    expect(existsSync(join(project, ".kiro", "settings", "mcp.json"))).toBe(true);
+
+    const other = run(tool, [], ".aidlc");
+    expect(other.status).toBe(0);
+    expect(other.stdout).toContain('"angular-cli"');
+  });
+});
+
 describe("angular plugin composed into a Claude install", () => {
   let tmp = "";
   let project = "";
@@ -250,7 +346,7 @@ describe("angular plugin composed into a Claude install", () => {
   test("every angular step lands before its target stage's Completion Handoff", () => {
     const stagesDir = join(project, ".claude", "aidlc-common", "stages");
     const composed = walkMarkdownFiles(stagesDir).filter((file) => readFileSync(file, "utf-8").includes("(angular):"));
-    expect(composed.length).toBe(3);
+    expect(composed.length).toBe(4);
     const late: string[] = [];
     for (const file of composed) {
       const text = readFileSync(file, "utf-8").replace(/\r\n/g, "\n");

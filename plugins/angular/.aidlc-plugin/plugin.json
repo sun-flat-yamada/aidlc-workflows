@@ -1,9 +1,13 @@
 {
   "name": "angular",
-  "version": "0.1.0",
-  "description": "Angular front-end pack: Angular implementation rules, a UI-element-to-API-to-state binding table in the functional design, a change impact map with reuse/append-only/rebuild/delete zones, the build-lint-unit loop, and the human-written acceptance cases as the final gate, checked by two advisory sensors.",
-  "author": { "name": "sun-flat-yamada" },
-  "dependencies": ["core"],
+  "version": "0.2.0",
+  "description": "Angular front-end pack: Angular implementation rules, a UI-element-to-API-to-state binding table in the functional design, a change impact map with reuse/append-only/rebuild/delete zones, the build-lint-unit loop, and the human-written acceptance cases as the final gate, checked by two advisory sensors, plus the local Angular CLI MCP server (aidlc angular-mcp).",
+  "author": {
+    "name": "sun-flat-yamada"
+  },
+  "dependencies": [
+    "core"
+  ],
   "aidlc": {
     "rulesLevel": "team",
     "contributes": {
@@ -12,6 +16,12 @@
       "sensors": "sensors/",
       "tools": "tools/",
       "memory": "memory/"
+    },
+    "commands": {
+      "angular-mcp": {
+        "script": "tools/angular-mcp.ts",
+        "description": "Add the Angular CLI MCP server (local, read-only, offline) to this project's MCP settings"
+      }
     }
   }
 }

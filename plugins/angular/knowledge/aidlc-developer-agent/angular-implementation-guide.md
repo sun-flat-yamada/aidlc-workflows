@@ -65,3 +65,20 @@ functions 80, lines 80.
   add `eslint-disable` to pass lint.
 - Upgrade Angular, TypeScript or the test runner as part of a feature: Angular
   pins the TypeScript minor, so they move together in a change of their own.
+
+## The Angular CLI MCP server
+
+When the project has the `angular-cli` MCP server (added by the person with
+`aidlc angular-mcp`), it runs the project's own Angular CLI on this machine,
+read-only and offline. Use it for facts the CLI knows better than a general
+guide:
+
+| Tool | Use it to |
+| --- | --- |
+| `list_projects` | Find the workspace (`angular.json` path), the application or library a Unit belongs to, its source root and the Angular version; call it first |
+| `get_best_practices` | With the workspace path from `list_projects`, read the best-practices guide for the installed Angular version before planning or writing code; where it differs from this guide, it wins |
+| `onpush_zoneless_migration` | See which components are not yet `OnPush` or depend on zone.js, before touching change detection |
+
+Builds, tests and the dev server are still run with the project's own commands,
+so their output is the stage's evidence. Without the server, this guide and the
+project's code are the sources.

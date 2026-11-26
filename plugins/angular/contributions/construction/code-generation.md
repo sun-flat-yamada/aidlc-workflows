@@ -46,6 +46,13 @@ Add to the delegation prompt:
   that the developer reads `angular-implementation-guide.md` from its knowledge.
 - That files in the plan's Reuse zone are not edited and Append-only files only
   gain lines; a needed change outside the plan goes into the plan first.
+- When the `angular-cli` MCP server is available (the person added it with
+  `{{INVOKE}} angular-mcp`), that the developer first calls its
+  `list_projects` tool to find the workspace and the application or library
+  the Unit belongs to, then `get_best_practices` with that workspace path (the
+  guide that matches the installed Angular version, which wins over a general
+  rule where they differ). Without the server, the knowledge guide alone
+  applies.
 - That after each file set it runs the project's build, lint and unit tests
   with coverage and repeats until all pass, without `.skip` / `.only`, lowered
   thresholds or `eslint-disable`.
