@@ -1,0 +1,26 @@
+{
+  "name": "codebase-atlas",
+  "version": "0.1.0",
+  "description": "Codebase Atlas for Reverse Engineering: every claim about the code cites the path:line it rests on or says UNKNOWN, and a deterministic parser (graphify, tree-sitter, no LLM) counts the source files independently so that no file is left out of the component inventory. Advisory gate sensors check both.",
+  "author": {
+    "name": "sun-flat-yamada"
+  },
+  "dependencies": [
+    "core"
+  ],
+  "aidlc": {
+    "rulesLevel": "team",
+    "contributes": {
+      "overlays": "contributions/",
+      "knowledge": "knowledge/",
+      "sensors": "sensors/",
+      "tools": "tools/"
+    },
+    "commands": {
+      "atlas-graph": {
+        "script": "tools/atlas-graph.ts",
+        "description": "Count the source files with graphify (build) and check a code knowledge base's citations and coverage (check)"
+      }
+    }
+  }
+}
